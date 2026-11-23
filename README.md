@@ -1,67 +1,86 @@
 # Mechanic Tracker
 
-Discord bot za evidenciju popravaka i isplata, MySQL pohrana te Electron desktop aplikacija za administraciju.
+Discord bot za evidenciju popravaka/isplata, MySQL pohrana i Electron desktop aplikacija za administraciju.
 
-## Što radi
+## Funkcije
 
-- Gumb **Dodaj popravku** otvara modal za broj značke i broj popravki; evidencijske poruke se automatski ažuriraju.
-- Gumb **Resetiraj popravku** otvara reset ovlaštenim ulogama. Reset postavlja popravke tekućeg obračunskog razdoblja na 0; povijest popravki i starih isplata ostaje u bazi.
-- Gumb **Isplati** prikazuje izbor igrača s neisplaćenim saldom. Isplata čuva zapis, umanjuje saldo i osvježava panel.
-- Desktop alat omogućuje unos popravke za drugog člana servera, pregled evidencije i isplatu/reset s provjerom ovlaštenog role ID-ja.
-- Cijena je podesiva kroz `REPAIR_RATE` (po zadanim postavkama 1.650 $ po popravci).
+- **Dodaj popravku** otvara Discord modal za broj značke i količinu. Poruke evidencije automatski se osvježavaju.
+- **Resetiraj popravku** postavlja tekuće obračunsko razdoblje na nulu. Povijest ostaje spremljena.
+- **Isplati** nudi izbor igrača s neisplaćenim saldom i sprema isplatu.
+- Desktop aplikacija omogućuje unos popravke za drugog člana, pregled i administraciju. Prijava je preko Discord OAuth2 i ovlaštenja se provjeravaju prema rolama.
 
-## Preduvjeti
+## Railway postavljanje
 
-- Node.js 22 ili noviji, npm i MySQL 8+
-- Discord aplikacija/bot s uključenim **Server Members Intent** u Developer Portalu; botu trebaju `applications.commands`, `bot`, te server permissioni **View Channels**, **Send Messages**, **Embed Links** i **Read Message History**. Pozovi bota na server.
-- MySQL baza dostupna botu; Northflank MySQL dodatak ili zasebna MySQL instanca.
+### 1. MySQL servis
 
-## Lokalna priprema
+U Railway projektu dodaj MySQL servis. Ostavi ga na privatnoj mreži. U njegovoj kartici **Variables** postoje `MYSQL_URL`, `MYSQLHOST`, `MYSQLPORT`, `MYSQLUSER`, `MYSQLPASSWORD` i `MYSQLDATABASE`.
 
-1. Kopiraj `.env.example` u `.env`.
-2. U Discord Developer Portal napravi aplikaciju i bot te popuni `DISCORD_TOKEN`, `DISCORD_CLIENT_ID` i `DISCORD_GUILD_ID`.
-3. Dodaj MySQL connection string u `DATABASE_URL`, na primjer `mysql://korisnik:lozinka@host:3306/mechanic_tracker`.
-4. Uključi Developer Mode u Discordu i kopiraj ID-jeve uloga u `REPAIR_ROLE_IDS`, `RESET_ROLE_IDS`, `PAYOUT_ROLE_IDS`. Više uloga odvoji zarezom. Za desktop OAuth postavi `DISCORD_CLIENT_SECRET` te `DESKTOP_REDIRECT_URI` identičan adresi registriranoj u Discord Developer Portalu.
-5. Po želji postavi `REPAIR_CHANNEL_ID`, `PAYOUT_CHANNEL_ID` i `REPAIR_RATE`.
-6. Pokreni:
+Promijeni/regeneriraj MySQL lozinku ako je ikad bila objavljena na slici ili poslana javno. Ne stavljaj `MYSQL_ROOT_PASSWORD` u kod ili GitHub.
 
-   ```powershell
-   npm install
-   npm run register-commands
-   npm run build
-   npm start
-   ```
+### 2. Bot servis
 
-7. U Discordu pokreni `/post-panels` (možeš odabrati kanale). Zapamćene poruke bot ažurira nakon svake promjene.
+Dodaj GitHub repo `devcorestudio28/Gringos-Mechanic-Evidence` kao novi Railway service. Railway automatski prepoznaje `Dockerfile` u korijenu repozitorija.
 
-Desktop aplikacija se pokreće lokalno s `npm run desktop` nakon builda. Unesi HTTPS API adresu i prijavi se Discord računom. API je dostupan na portu `3210`; izloži ga kroz HTTPS reverse proxy na Northflanku. OAuth redirect URL unesi i u Discord Developer Portalu.
+U bot servisu dodaj variable reference:
 
-## Northflank
+| Variable bot servisa | Vrijednost |
+| --- | --- |
+| `DATABASE_URL` | `${{MySQL.MYSQL_URL}}` |
+| `DISCORD_TOKEN` | bot token iz Discord Developer Portal |
+| `DISCORD_CLIENT_ID` | Discord application ID |
+| `DISCORD_CLIENT_SECRET` | OAuth2 client secret |
+| `DISCORD_GUILD_ID` | Discord server ID |
+| `REPAIR_ROLE_IDS` | Role ID-jevi koji mogu dodavati popravke, odvojeni zarezom |
+| `RESET_ROLE_IDS` | Role ID-jevi koji mogu resetirati |
+| `PAYOUT_ROLE_IDS` | Role ID-jevi koji mogu evidentirati isplate |
+| `REPAIR_RATE` | iznos po popravci, npr. `1650` |
+| `TIMEZONE` | `Europe/Zagreb` |
+| `DESKTOP_REDIRECT_URI` | `https://TVOJ-BOT-DOMAIN/auth/callback` |
+| `REPAIR_CHANNEL_ID` | opcionalni kanal za panel popravki |
+| `PAYOUT_CHANNEL_ID` | opcionalni kanal za panel isplata |
 
-1. Napravi Northflank project/service iz ovog repozitorija i koristi `Dockerfile` kao build konfiguraciju.
-2. Dodaj MySQL addon ili spoji vanjski MySQL te postavi sve varijable iz `.env.example` u service secrets/environment. `DATABASE_URL` mora koristiti host koji je dostupan iz servicea. Registriraj `DESKTOP_REDIRECT_URI` kao OAuth2 redirect u Discord aplikaciji.
-3. Deployaj. Bot automatski kreira tablice pri pokretanju. Slash naredbu registriraj jednom lokalno (`npm run register-commands`) s istim Discord tokenom i ID-jevima.
-4. Za desktop API koristi javni HTTPS hostname i izloži `PORT` servisa. `DESKTOP_REDIRECT_URI` mora biti `https://<hostname>/auth/callback`, a ovaj URL registriraj i u Discord Developer Portalu. Desktop OAuth prozor po uspješnoj prijavi vraća jednokratnu sesiju aplikaciji.
+`MySQL` u `${{MySQL.MYSQL_URL}}` mora točno odgovarati nazivu database servisa na Railwayju. Ako servis ima drugo ime, zamijeni ga, npr. `${{mysql.MYSQL_URL}}`. Koristi privatni `MYSQL_URL`; nemoj koristiti `MYSQL_PUBLIC_URL`/TCP proxy za bot koji je u istom Railway projektu.
 
-Northflank sučelje dodjeljuje HTTPS hostname i `PORT`; postavi taj port kao HTTP port servisa. Environment secrets dodaj kroz postavke servisa.
+Railway sam postavlja `PORT`; nemoj ga ručno zadavati. U **Settings → Networking** dodijeli bot servisu Railway domain. Stavi tu domenu u `DESKTOP_REDIRECT_URI`, a isti callback dodaj u Discord Developer Portal → OAuth2 → Redirects. Ako se domain automatski izlaže kao `RAILWAY_PUBLIC_DOMAIN`, aplikacija može sama izračunati callback, no registracija u Discordu i dalje mora biti identična. U Railway **Settings → Deploy → Healthcheck Path** možeš postaviti `/health`.
 
-## Desktop paket za Windows
+Dodaj bot na Discord server s `applications.commands` i `bot` scopeom. U Developer Portalu uključi **Server Members Intent**. Botu trebaju **View Channels**, **Send Messages**, **Embed Links** i **Read Message History** dozvole.
 
-Na Windows računalu s kloniranim projektom:
+### 3. Objavi panele i slash naredbu
+
+Lokalno kopiraj `.env.example` u `.env`, upiši Discord varijable i Railway MySQL vrijednost u `DATABASE_URL`, pa pokreni:
 
 ```powershell
-npm install
-npm run build
-npx electron-packager . "Mechanic Tracker" --platform=win32 --arch=x64 --out=release --ignore="src|\.env|node_modules"
+npm ci
+npm run register-commands
 ```
 
-Desktop se može pokretati iz projekta naredbom `npm run desktop` nakon `npm run build`. Za lokalni Windows instalacijski paket pokreni `npm run desktop:pack`; `.exe` će biti u `release/`. Push taga oblika `v1.0.0` automatski izgradi Windows `.exe` i objavi ga u GitHub Releases. Instalacijski paket nije unaprijed potpisan.
+To registrira `/post-panels` na serveru. Nakon deploya u Railway logovima potvrdi da je bot online, zatim u Discordu pokreni `/post-panels` i odaberi kanale.
 
-## Sigurnosne napomene
+### 4. Desktop aplikacija
 
-- Desktop API koristi Discord OAuth2 prijavu i provjerava člana te njegove role na serveru prije svake privilegirane radnje. Drži `DISCORD_CLIENT_SECRET` u Northflank secrets.
-- Koristi TLS prema MySQL-u kad ga provider podržava i redovno radi backup baze.
+Preuzmi Windows installer sa [GitHub Releases](https://github.com/devcorestudio28/Gringos-Mechanic-Evidence/releases). U desktop aplikaciju upiši botov Railway HTTPS domain i odaberi **Prijava putem Discorda**. Discord račun mora imati odgovarajuću server ulogu.
 
-## Baza
+Za promjenu koda deployaj novu verziju s GitHuba na Railwayju. Installer se može lokalno izgraditi na Windowsu naredbom `npm run desktop:pack`.
 
-Bot automatski stvara `repair_events`, `payouts` i `guild_state`. Reset je logički (povećanje `reset_batch`), pa se stara evidencija ne briše. `payouts` prati broj isplaćenih popravki u istom obračunskom razdoblju, tako da reset novog razdoblja ne oduzima novo zarađene popravke starim isplatama.
+## Lokalni razvoj
+
+1. `npm ci`
+2. Kopiraj `.env.example` u `.env` i unesi Discord/MySQL konfiguraciju.
+3. `npm run register-commands`
+4. `npm run dev` za bot; `npm run build` pa `npm run desktop` za desktop klijent.
+
+## Railway database varijable
+
+Aplikacija prihvaća jedan od ovih oblika:
+
+- `DATABASE_URL` ili `MYSQL_URL` kao MySQL connection URI (preporučeno `${{MySQL.MYSQL_URL}}` na Railwayju), ili
+- `MYSQLHOST`, `MYSQLPORT`, `MYSQLUSER`, `MYSQLPASSWORD` i `MYSQLDATABASE` zasebno.
+
+Bot pri prvom pokretanju stvara `repair_events`, `payouts` i `guild_state`. Reset radi povećanjem obračunskog `reset_batch`, pa povijest popravki i isplata nije obrisana. Railway servis treba imati pristup bazi preko iste privatne mreže.
+
+## Sigurnost
+
+- Rotiraj vjerodajnice koje su bile vidljive na slikama. Slike mogu ostati spremljene u razgovorima ili cloud povijesti.
+- Tajne drži samo u Railway Variables/Secrets i lokalnom `.env`; `.env` se ne commit-a.
+- Uključi redovne MySQL backup-e u Railwayju.
+- Koristi samo HTTPS bot domain u desktop aplikaciji.

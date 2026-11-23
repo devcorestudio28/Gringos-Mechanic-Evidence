@@ -20,6 +20,7 @@ function startDesktopApi(): void {
   const server = createServer(async (req, res) => {
     if (req.method === 'OPTIONS') { res.writeHead(204, { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization,content-type', 'access-control-allow-methods': 'GET,POST,OPTIONS' }); return res.end(); }
     const url = new URL(req.url ?? '/', 'http://localhost');
+    if (req.method === 'GET' && url.pathname === '/health') return json(res, 200, { ok: true });
     if (req.method === 'GET' && url.pathname === '/auth/login') {
       if (!config.oauthClientSecret) return json(res, 503, { error: 'Desktop OAuth nije konfiguriran. Postavi DISCORD_CLIENT_SECRET.' });
       const state = randomBytes(24).toString('hex'); oauthStates.set(state, Date.now() + 5 * 60_000);

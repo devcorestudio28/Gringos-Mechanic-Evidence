@@ -29,10 +29,6 @@ export async function initializeDatabase(): Promise<void> {
     paid_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     INDEX idx_payouts_guild_user (guild_id, user_id)
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
-  // Add this field for installations created by an earlier version.
-  const [columns] = await pool.query<mysql.RowDataPacket[]>("SHOW COLUMNS FROM payouts LIKE 'reset_batch'");
-  if (!columns.length) await pool.query('ALTER TABLE payouts ADD COLUMN reset_batch BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER amount');
-  await pool.query('UPDATE payouts p JOIN guild_state g ON p.guild_id = g.guild_id SET p.reset_batch = g.reset_batch WHERE p.reset_batch = 0');
   await pool.query(`CREATE TABLE IF NOT EXISTS guild_state (
     guild_id VARCHAR(32) NOT NULL PRIMARY KEY,
     reset_batch BIGINT UNSIGNED NOT NULL DEFAULT 0,
@@ -42,6 +38,10 @@ export async function initializeDatabase(): Promise<void> {
     payout_message_id VARCHAR(32) NULL,
     payout_channel_id VARCHAR(32) NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  // Add this field for installations created by an earlier version.
+  const [columns] = await pool.query<mysql.RowDataPacket[]>("SHOW COLUMNS FROM payouts LIKE 'reset_batch'");
+  if (!columns.length) await pool.query('ALTER TABLE payouts ADD COLUMN reset_batch BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER amount');
+  await pool.query('UPDATE payouts p JOIN guild_state g ON p.guild_id = g.guild_id SET p.reset_batch = g.reset_batch WHERE p.reset_batch = 0');
 }
 
 async function currentBatch(guildId: string, conn: mysql.PoolConnection | typeof pool = pool): Promise<number> {
