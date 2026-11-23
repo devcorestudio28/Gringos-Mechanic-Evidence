@@ -1,0 +1,36 @@
+{
+  "name": "mechanic-tracker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Discord repair and payout tracker with MySQL and desktop manager",
+  "main": "dist/desktop/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && node scripts/copy-desktop-html.cjs",
+    "start": "node dist/bot/index.js",
+    "dev": "tsx src/bot/index.ts",
+    "desktop": "electron .",
+    "desktop:dev": "electron .",
+    "desktop:pack": "npm run build && electron-builder --win nsis",
+    "register-commands": "tsx src/bot/register-commands.ts"
+  },
+  "dependencies": {
+    "discord.js": "^14.19.3",
+    "dotenv": "^16.4.7",
+    "mysql2": "^3.14.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.15.3",
+    "electron": "^35.2.1",
+    "electron-builder": "^26.0.12",
+    "tsx": "^4.19.3",
+    "typescript": "^5.8.3"
+  },
+  "build": {
+    "appId": "com.gringos.mechanictracker",
+    "productName": "Mechanic Tracker",
+    "directories": { "output": "release" },
+    "files": ["dist/desktop/**/*", "package.json"],
+    "win": { "target": [{ "target": "nsis", "arch": ["x64"] }] },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true, "createDesktopShortcut": true }
+  }
+}
