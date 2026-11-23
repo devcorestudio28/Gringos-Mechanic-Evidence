@@ -13,9 +13,23 @@ export async function repairEmbed(guildId: string): Promise<EmbedBuilder> {
   const s = await getSnapshot(guildId);
   const badges = s.badges.length ? s.badges.map((r) => `👮 ${r.badge} — ${fmt(r.count)}`).join('\n') : 'Još nema evidentiranih popravki.';
   const players = s.players.filter((p) => p.repairs).map((p) => `🔧 <@${p.userId}> — ${fmt(p.repairs)}`).join('\n') || 'Još nema evidentiranih igrača.';
-  const embed = new EmbedBuilder().setColor(0x5b8cff).setTitle('🚓 POLICIJA | EVIDENCIJA POPRAVAKA').setDescription('Pregled popravaka po policijskim značkama i igračima koji su ih unijeli.\n\n**Evidencija**\n\n**Značka — Popravaka**\n' + badges + '\n\n**Igrač — Popravaka**\n' + players + `\n\n**Ukupno od zadnjeg reseta**\n${fmt(s.totalSinceReset)}\n\n*Resetiranje samo ručno • Automatsko ažuriranje nakon svake promjene • ${config.timezone}*`);
-  return embed;
+  const dateParts = s.resetAt
+    ? new Intl.DateTimeFormat('en-CA', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: config.timezone }).formatToParts(new Date(s.resetAt))
+    : [];
+  const datePart = (type: Intl.DateTimeFormatPartTypes) => dateParts.find((part) => part.type === type)?.value;
+  const evidenceDate = s.resetAt ? `${datePart('day')}.${datePart('month')}.${datePart('year')}.` : '13.11.2026.';
+  return new EmbedBuilder()
+    .setColor(0x5b8cff)
+    .setTitle('🚓 POLICIJA | EVIDENCIJA POPRAVAKA')
+    .setDescription(`Pregled popravaka po policijskim značkama i igračima koji su ih unijeli.\n\n**Evidencija od ${evidenceDate}**`)
+    .addFields(
+      { name: 'Značka — Popravaka', value: badges, inline: true },
+      { name: 'Igrač — Popravaka', value: players, inline: true },
+      { name: 'Ukupno od zadnjeg reseta', value: fmt(s.totalSinceReset), inline: false },
+    )
+    .setFooter({ text: `Resetiranje samo ručno • Automatsko ažuriranje nakon svake promjene • ${config.timezone}` });
 }
+
 export async function payoutEmbed(guildId: string): Promise<EmbedBuilder> {
   const s = await getSnapshot(guildId);
   const rows = s.players.filter((p) => p.unpaidRepairs > 0).map((p) => `🔧 <@${p.userId}> — ${fmt(p.unpaidRepairs)} popravaka — **${fmt(p.unpaidAmount)} $**`).join('\n') || 'Nema neisplaćenih popravki.';
