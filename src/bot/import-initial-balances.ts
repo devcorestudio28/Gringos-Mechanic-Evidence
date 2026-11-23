@@ -1,5 +1,6 @@
 import { pool, initializeDatabase } from './db';
 import { config } from './config';
+import { syncSavedPanels } from './panels';
 
 const importKey = 'legacy-snapshot-2026-11-23-v1';
 const badges: Array<[string, number]> = [
@@ -30,9 +31,9 @@ async function run(): Promise<void> {
       console.log(`Početno stanje ${importKey} već je uvezeno; nema promjena.`);
       return;
     }
-    const [repairs] = await conn.query<any[]>('SELECT COUNT(*) AS count FROM repair_events WHERE guild_id = ?', [config.guildId]);
+    const [repairs] = await conn.query<any[]>('SELECT COUNT(*) AS count FROM repair_events WHERE guild_id = ? AND reset_batch = ?', [config.guildId, batch]);
     if (Number(repairs[0].count) > 0) throw new Error('U bazi već postoje popravke. Uvoz je prekinut kako se postojeći zapisi ne bi dvostruko uračunali.');
-    const [payouts] = await conn.query<any[]>('SELECT COUNT(*) AS count FROM payouts WHERE guild_id = ?', [config.guildId]);
+    const [payouts] = await conn.query<any[]>('SELECT COUNT(*) AS count FROM payouts WHERE guild_id = ? AND reset_batch = ?', [config.guildId, batch]);
     if (Number(payouts[0].count) > 0) throw new Error('U bazi već postoje isplate. Uvoz je prekinut kako bi se izbjeglo pogrešno stanje salda.');
 
     await conn.query('INSERT INTO opening_balance_imports (import_key, guild_id) VALUES (?, ?)', [importKey, config.guildId]);
@@ -46,6 +47,8 @@ async function run(): Promise<void> {
     const playerTotal = players.reduce((sum, [, , count]) => sum + count, 0);
     console.log(`Početno stanje je uvezeno: ${badges.length} znački (${badgeTotal} popravki) i ${players.length} igrača (${playerTotal} popravki). Stefan Turbina i Mosa Pucko nisu uvezeni.`);
     if (badgeTotal !== playerTotal) console.warn('Napomena: zbir znački i zbir igrača su različiti; liste su sačuvane odvojeno prema dostavljenim podacima.');
+    try { await syncSavedPanels(config.guildId); console.log('Discord paneli su osvježeni.'); }
+    catch (error) { console.error('Uvoz je spremljen, ali Discord paneli nisu osvježeni. Pokreni /post-panels ili pošalji grešku Codexu:', error); }
   } catch (error) {
     await conn.rollback();
     throw error;

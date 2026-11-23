@@ -1,13 +1,13 @@
-import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, type Client, type TextChannel } from 'discord.js';
+import { ActionRowBuilder, ButtonBuilder, ButtonStyle, EmbedBuilder, REST, Routes, type Client, type TextChannel } from 'discord.js';
 import { config } from './config';
 import { getSnapshot, getBoards, saveBoard } from './db';
 
 const fmt = (n: number) => new Intl.NumberFormat('hr-HR').format(n);
-const repairButtons = () => new ActionRowBuilder<ButtonBuilder>().addComponents(
+export const repairButtons = () => new ActionRowBuilder<ButtonBuilder>().addComponents(
   new ButtonBuilder().setCustomId('repair:add').setLabel('➕ Dodaj popravku').setStyle(ButtonStyle.Success),
   new ButtonBuilder().setCustomId('repair:reset').setLabel('🔄 Resetiraj popravku').setStyle(ButtonStyle.Danger),
 );
-const payoutButtons = () => new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId('payout:pay').setLabel('💵 Isplati').setStyle(ButtonStyle.Primary));
+export const payoutButtons = () => new ActionRowBuilder<ButtonBuilder>().addComponents(new ButtonBuilder().setCustomId('payout:pay').setLabel('💵 Isplati').setStyle(ButtonStyle.Primary));
 
 export async function repairEmbed(guildId: string): Promise<EmbedBuilder> {
   const s = await getSnapshot(guildId);
@@ -35,6 +35,12 @@ async function editSaved(client: Client, guildId: string, kind: 'repair' | 'payo
   } catch (e) { console.error(`Could not update ${kind} panel:`, e); }
 }
 export async function refreshPanels(client: Client, guildId: string): Promise<void> { await editSaved(client, guildId, 'repair'); await editSaved(client, guildId, 'payout'); }
+export async function syncSavedPanels(guildId: string): Promise<void> {
+  const boards = await getBoards(guildId);
+  const rest = new REST({ version: '10' }).setToken(config.token);
+  if (boards.repair) await rest.patch(Routes.channelMessage(boards.repair.channelId, boards.repair.messageId), { body: { embeds: [(await repairEmbed(guildId)).toJSON()], components: [repairButtons().toJSON()] } });
+  if (boards.payout) await rest.patch(Routes.channelMessage(boards.payout.channelId, boards.payout.messageId), { body: { embeds: [(await payoutEmbed(guildId)).toJSON()], components: [payoutButtons().toJSON()] } });
+}
 export async function postPanels(client: Client, guildId: string, repairChannelId?: string, payoutChannelId?: string): Promise<void> {
   const repairChannel = await client.channels.fetch(repairChannelId || config.repairChannelId || '') as TextChannel | null;
   const payoutChannel = await client.channels.fetch(payoutChannelId || config.payoutChannelId || repairChannelId || '') as TextChannel | null;
