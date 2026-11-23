@@ -18,9 +18,16 @@ function databaseConnectionString(): string {
   }
   throw new Error('Set DATABASE_URL/MYSQL_URL or the Railway MYSQLHOST, MYSQLPORT, MYSQLUSER, MYSQLPASSWORD and MYSQLDATABASE variables.');
 }
-function roleIds(name: string): Set<string> {
-  return new Set((process.env[name] ?? '').split(',').map((x) => x.trim()).filter(Boolean));
-}
+const managementRoles = new Set([
+  '1563902164366131291', // Vlasnik
+  '1563902615119593522', // Zamenik Vlasnika
+  '1565009753879478312', // Sef Smene
+  '1563909437465432258', // Admin (.)
+]);
+const mechanicRoles = new Set([
+  '1563906285265485844', // Mehanicar
+  '1564005951638470736', // Probni Mehanicar
+]);
 
 export const config = {
   token: required('DISCORD_TOKEN'),
@@ -29,9 +36,10 @@ export const config = {
   databaseUrl: databaseConnectionString(),
   oauthClientSecret: process.env.DISCORD_CLIENT_SECRET?.trim() ?? '',
   desktopRedirectUri: process.env.DESKTOP_REDIRECT_URI?.trim() || (process.env.RAILWAY_PUBLIC_DOMAIN ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/auth/callback` : 'http://localhost:3210/auth/callback'),
-  repairRoles: roleIds('REPAIR_ROLE_IDS'),
-  resetRoles: roleIds('RESET_ROLE_IDS'),
-  payoutRoles: roleIds('PAYOUT_ROLE_IDS'),
+  // Discord member roles are checked on every action, so role assignments stay current without Railway variables.
+  repairRoles: new Set([...managementRoles, ...mechanicRoles]),
+  resetRoles: managementRoles,
+  payoutRoles: managementRoles,
   repairChannelId: process.env.REPAIR_CHANNEL_ID?.trim(),
   payoutChannelId: process.env.PAYOUT_CHANNEL_ID?.trim(),
   port: Number(process.env.PORT ?? 3210),

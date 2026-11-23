@@ -30,9 +30,6 @@ U bot servisu dodaj variable reference:
 | `DISCORD_CLIENT_ID` | Discord application ID |
 | `DISCORD_CLIENT_SECRET` | OAuth2 client secret |
 | `DISCORD_GUILD_ID` | Discord server ID |
-| `REPAIR_ROLE_IDS` | Role ID-jevi koji mogu dodavati popravke, odvojeni zarezom |
-| `RESET_ROLE_IDS` | Role ID-jevi koji mogu resetirati |
-| `PAYOUT_ROLE_IDS` | Role ID-jevi koji mogu evidentirati isplate |
 | `REPAIR_RATE` | iznos po popravci, npr. `1650` |
 | `TIMEZONE` | `Europe/Zagreb` |
 | `DESKTOP_REDIRECT_URI` | `https://TVOJ-BOT-DOMAIN/auth/callback` |
@@ -42,6 +39,8 @@ U bot servisu dodaj variable reference:
 `MySQL` u `${{MySQL.MYSQL_URL}}` mora točno odgovarati nazivu database servisa na Railwayju. Ako servis ima drugo ime, zamijeni ga, npr. `${{mysql.MYSQL_URL}}`. Koristi privatni `MYSQL_URL`; nemoj koristiti `MYSQL_PUBLIC_URL`/TCP proxy za bot koji je u istom Railway projektu.
 
 Railway sam postavlja `PORT`; nemoj ga ručno zadavati. U **Settings → Networking** dodijeli bot servisu Railway domain. Stavi tu domenu u `DESKTOP_REDIRECT_URI`, a isti callback dodaj u Discord Developer Portal → OAuth2 → Redirects. Ako se domain automatski izlaže kao `RAILWAY_PUBLIC_DOMAIN`, aplikacija može sama izračunati callback, no registracija u Discordu i dalje mora biti identična. U Railway **Settings → Deploy → Healthcheck Path** možeš postaviti `/health`.
+
+Role ID-jevi su ugrađeni u bot, pa role varijable ne treba dodavati u Railway. `Vlasnik`, `Zamenik Vlasnika`, `Sef Smene` i `Admin (.)` mogu unositi popravke, resetirati i evidentirati isplate. `Mehanicar` i `Probni Mehanicar` mogu unositi popravke. Bot provjerava trenutne uloge člana pri radnji, pa dodjela ili uklanjanje Discord uloge vrijedi automatski.
 
 Dodaj bot na Discord server s `applications.commands` i `bot` scopeom. U Developer Portalu uključi **Server Members Intent**. Botu trebaju **View Channels**, **Send Messages**, **Embed Links** i **Read Message History** dozvole.
 
