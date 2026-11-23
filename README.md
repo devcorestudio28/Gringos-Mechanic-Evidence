@@ -55,6 +55,10 @@ npm run register-commands
 
 To registrira `/post-panels` na serveru. Nakon deploya u Railway logovima potvrdi da je bot online, zatim u Discordu pokreni `/post-panels` i odaberi kanale.
 
+### Jednokratni uvoz starog stanja
+
+Nakon deploya otvori bot service → **Console** i pokreni `npm run import-initial-balances`. Uvoz je idempotentan, sprema značke i igrače odvojeno, prekida se ako već postoje repair ili payout zapisi te ne uključuje Stefan Turbina ni Mosa Pucko. Dostavljeni podaci daju 100 popravki po značkama i 88 po igračima; uvoz čuva oba zbira tačno kako su poslani.
+
 ### 4. Desktop aplikacija
 
 Preuzmi Windows installer sa [GitHub Releases](https://github.com/devcorestudio28/Gringos-Mechanic-Evidence/releases). U desktop aplikaciju upiši botov Railway HTTPS domain i odaberi **Prijava putem Discorda**. Discord račun mora imati odgovarajuću server ulogu.

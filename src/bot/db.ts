@@ -38,6 +38,20 @@ export async function initializeDatabase(): Promise<void> {
     payout_message_id VARCHAR(32) NULL,
     payout_channel_id VARCHAR(32) NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS opening_balances (
+    guild_id VARCHAR(32) NOT NULL,
+    reset_batch BIGINT UNSIGNED NOT NULL,
+    balance_type ENUM('badge', 'player') NOT NULL,
+    subject_id VARCHAR(32) NOT NULL,
+    subject_name VARCHAR(100) NOT NULL,
+    quantity INT UNSIGNED NOT NULL,
+    PRIMARY KEY (guild_id, reset_batch, balance_type, subject_id)
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS opening_balance_imports (
+    import_key VARCHAR(100) NOT NULL PRIMARY KEY,
+    guild_id VARCHAR(32) NOT NULL,
+    imported_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
   // Add this field for installations created by an earlier version.
   const [columns] = await pool.query<mysql.RowDataPacket[]>("SHOW COLUMNS FROM payouts LIKE 'reset_batch'");
   if (!columns.length) await pool.query('ALTER TABLE payouts ADD COLUMN reset_batch BIGINT UNSIGNED NOT NULL DEFAULT 0 AFTER amount');
@@ -67,8 +81,16 @@ export async function resetRepairs(guildId: string): Promise<void> {
 
 export async function getSnapshot(guildId: string): Promise<Snapshot> {
   const batch = await currentBatch(guildId);
-  const [badgeRows] = await pool.query<mysql.RowDataPacket[]>(`SELECT badge, SUM(quantity) AS count FROM repair_events WHERE guild_id = ? AND reset_batch = ? GROUP BY badge ORDER BY count DESC, badge ASC`, [guildId, batch]);
-  const [repairRows] = await pool.query<mysql.RowDataPacket[]>(`SELECT user_id, MAX(username) AS username, SUM(quantity) AS repairs FROM repair_events WHERE guild_id = ? AND reset_batch = ? GROUP BY user_id`, [guildId, batch]);
+  const [badgeRows] = await pool.query<mysql.RowDataPacket[]>(`SELECT subject_id AS badge, SUM(count) AS count FROM (
+    SELECT badge AS subject_id, SUM(quantity) AS count FROM repair_events WHERE guild_id = ? AND reset_batch = ? GROUP BY badge
+    UNION ALL
+    SELECT subject_id, SUM(quantity) AS count FROM opening_balances WHERE guild_id = ? AND reset_batch = ? AND balance_type = 'badge' GROUP BY subject_id
+  ) totals GROUP BY subject_id ORDER BY count DESC, subject_id ASC`, [guildId, batch, guildId, batch]);
+  const [repairRows] = await pool.query<mysql.RowDataPacket[]>(`SELECT user_id, MAX(username) AS username, SUM(repairs) AS repairs FROM (
+    SELECT user_id, MAX(username) AS username, SUM(quantity) AS repairs FROM repair_events WHERE guild_id = ? AND reset_batch = ? GROUP BY user_id
+    UNION ALL
+    SELECT subject_id AS user_id, MAX(subject_name) AS username, SUM(quantity) AS repairs FROM opening_balances WHERE guild_id = ? AND reset_batch = ? AND balance_type = 'player' GROUP BY subject_id
+  ) totals GROUP BY user_id`, [guildId, batch, guildId, batch]);
   const [paidRows] = await pool.query<mysql.RowDataPacket[]>(`SELECT user_id, SUM(repair_count) AS paid FROM payouts WHERE guild_id = ? AND reset_batch = ? GROUP BY user_id`, [guildId, batch]);
   const paid = new Map<string, number>(paidRows.map((r) => [String(r.user_id), Number(r.paid)]));
   const players: PlayerSummary[] = repairRows.map((r) => {
@@ -85,7 +107,11 @@ export async function createPayout(guildId: string, userId: string): Promise<{ p
   try {
     await conn.beginTransaction();
     const batch = await currentBatch(guildId, conn);
-    const [repairRows] = await conn.query<mysql.RowDataPacket[]>('SELECT MAX(username) AS username, COALESCE(SUM(quantity), 0) AS repairs FROM repair_events WHERE guild_id = ? AND user_id = ? AND reset_batch = ? FOR UPDATE', [guildId, userId, batch]);
+    const [repairRows] = await conn.query<mysql.RowDataPacket[]>(`SELECT MAX(username) AS username, COALESCE(SUM(quantity), 0) AS repairs FROM (
+      SELECT username, quantity FROM repair_events WHERE guild_id = ? AND user_id = ? AND reset_batch = ?
+      UNION ALL
+      SELECT subject_name AS username, quantity FROM opening_balances WHERE guild_id = ? AND subject_id = ? AND reset_batch = ? AND balance_type = 'player'
+    ) totals`, [guildId, userId, batch, guildId, userId, batch]);
     const repairs = Number(repairRows[0]?.repairs ?? 0);
     const [paidThisBatchRows] = await conn.query<mysql.RowDataPacket[]>('SELECT COALESCE(SUM(repair_count), 0) AS paid FROM payouts WHERE guild_id = ? AND user_id = ? AND reset_batch = ?', [guildId, userId, batch]);
     const currentUnpaid = Math.max(0, repairs - Number(paidThisBatchRows[0]?.paid ?? 0));
