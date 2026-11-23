@@ -5,6 +5,11 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Existing tag to package and publish
+        required: true
+        default: v1.0.0
 
 permissions:
   contents: write
@@ -14,6 +19,8 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_tag || github.ref_name }}
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -24,4 +31,5 @@ jobs:
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create ${{ github.ref_name }} release/*.exe --title "Mechanic Tracker ${{ github.ref_name }}" --generate-notes
+        shell: bash
+        run: gh release create ${{ inputs.release_tag || github.ref_name }} release/*.exe --title "Mechanic Tracker ${{ inputs.release_tag || github.ref_name }}" --generate-notes
